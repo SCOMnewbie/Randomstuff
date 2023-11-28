@@ -1,2 +1,3 @@
 # Randomstuff
-Place where I will place all random stuff
+
+- [WSL tips](/WSL/Demo.ps1)
