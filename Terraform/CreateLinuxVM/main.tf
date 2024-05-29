@@ -123,6 +123,16 @@ resource "azurerm_linux_virtual_machine" "my_terraform_vm" {
   boot_diagnostics {
     storage_account_uri = azurerm_storage_account.my_storage_account.primary_blob_endpoint
   }
+
+  custom_data = base64encode(<<EOF
+  #cloud-config
+  package_upgrade: true
+  packages:
+    - nginx
+  runcmd:
+    - systemctl start nginx
+  EOF
+  )
 }
 
 resource "azurerm_key_vault" "keyvault" {
@@ -141,10 +151,16 @@ resource "azurerm_role_assignment" "assign_current_user_kv_secret_officier" {
   scope              = azurerm_key_vault.keyvault.id
   role_definition_id = "/providers/Microsoft.Authorization/roleDefinitions/b86a8fe4-44ce-4948-aee5-eccb2c155cd7" #Key vault secret officier
   principal_id       = data.azurerm_client_config.current.object_id
+
+  
 }
 
 resource "azurerm_key_vault_secret" "add_private_key_to_kv" {
   name         = "myVM"
   value        = azapi_resource_action.ssh_public_key_gen.output.privateKey
   key_vault_id = azurerm_key_vault.keyvault.id
+
+  depends_on = [
+    azurerm_role_assignment.assign_current_user_kv_secret_officier
+  ]
 }
