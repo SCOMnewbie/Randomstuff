@@ -8,13 +8,10 @@ terraform init -upgrade
 terraform plan -out main.tfplan
 terraform apply "main.tfplan"
 
-terraform destroy -auto-approve
-
-Store ssh key locally
-
-$VaultName = "kv1039c37bb5c87bef"
-$PrivateKey = az keyvault secret show --vault-name $VaultName -n myvm | ConvertFrom-Json | % value
-
+$tfInfo = terraform output -json | ConvertFrom-Json
+$PrivateKey = az keyvault secret show --vault-name $tfInfo.keyvault_name.value -n $tfInfo.virtual_machine_name.value | ConvertFrom-Json | % value
 . ./functions.ps1
-Set-sshPrivateKey -PrivateKey $PrivateKey -VirtualMachineName myVM -Verbose
-ssh -i /root/.ssh/myVM azureadmin@13.82.145.27
+Set-sshPrivateKey -PrivateKey $PrivateKey -VirtualMachineName $tfInfo.virtual_machine_name.value -Verbose
+ssh -i "/root/.ssh/$($tfInfo.virtual_machine_name.value)" azureadmin@$($tfInfo.public_ip_address.value)
+
+terraform destroy -auto-approve

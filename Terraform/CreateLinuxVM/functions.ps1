@@ -37,7 +37,7 @@ PS> Get-LatestGithubRepositoryReleaseVersion -OrganizationName project-copacetic
         New-Item -Path $PrivateKeyFilePath -ItemType Directory -Force | Out-Null
     }
 
-    New-Item -Path $PrivateKeyFilePath -Name $VirtualMachineName -Value $PrivateKey | Out-Null
+    New-Item -Path $PrivateKeyFilePath -Name $VirtualMachineName -Value $PrivateKey -Force | Out-Null
 
 
     chmod 400 $(Join-Path $PrivateKeyFilePath $VirtualMachineName)

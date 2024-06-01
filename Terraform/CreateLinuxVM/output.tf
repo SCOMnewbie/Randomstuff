@@ -10,8 +10,8 @@ output "public_ip_address" {
   value = azurerm_linux_virtual_machine.my_terraform_vm.public_ip_address
 }
 
-output "keyvault_url" {
-  value = azurerm_key_vault.keyvault.vault_uri
+output "keyvault_name" {
+  value = azurerm_key_vault.keyvault.name
 }
 
 

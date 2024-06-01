@@ -16,6 +16,13 @@ variable "username" {
   default     = "azureadmin"
 }
 
+variable "gitPat" {
+  type        = string
+  description = "Git PAT to fetch private repo"
+  sensitive   = true
+  nullable = false
+}
+
 variable "myipaddress" {
   type        = string
   description = "Home IP address"

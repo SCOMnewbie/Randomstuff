@@ -120,17 +120,38 @@ resource "azurerm_linux_virtual_machine" "my_terraform_vm" {
     public_key = azapi_resource_action.ssh_public_key_gen.output.publicKey
   }
 
+  identity {
+    type = "SystemAssigned"
+  }
+
   boot_diagnostics {
     storage_account_uri = azurerm_storage_account.my_storage_account.primary_blob_endpoint
   }
 
   custom_data = base64encode(<<EOF
   #cloud-config
+  runcmd:
+    - apt-get -y update
+    - wget https://raw.githubusercontent.com/PowerShell/PowerShell/master/tools/install-powershell.sh
+    - chmod 755 install-powershell.sh
+    - ./install-powershell.sh
+    # Git
+    - git config --global user.name "scomnewbie"
+    - git config --global user.email "leon.francois75@gmail.com"
+    - mkdir /home/azureadmin/git
+    - git clone https://github.com/SCOMnewbie/PSMSALNet /home/azureadmin/git/PSMSALNet
+    - git clone "https://${var.gitPat}@github.com/SCOMnewbie/PesterPOC.git" /home/azureadmin/git/PesterPOC
+    - apt-get -y clean
+    - apt-get -y autoremove --purge
   package_upgrade: true
   packages:
-    - nginx
-  runcmd:
-    - systemctl start nginx
+  - curl
+  package_reboot_if_required: true
+  power_state:
+    delay: now
+    mode: reboot
+    message: Rebooting the OS
+    condition: if [ -e /var/run/reboot-required ]; then exit 0; else exit 1; fi
   EOF
   )
 }
@@ -151,8 +172,12 @@ resource "azurerm_role_assignment" "assign_current_user_kv_secret_officier" {
   scope              = azurerm_key_vault.keyvault.id
   role_definition_id = "/providers/Microsoft.Authorization/roleDefinitions/b86a8fe4-44ce-4948-aee5-eccb2c155cd7" #Key vault secret officier
   principal_id       = data.azurerm_client_config.current.object_id
+}
 
-  
+resource "azurerm_role_assignment" "assign_vm_kv_secret_officier" {
+  scope              = azurerm_key_vault.keyvault.id
+  role_definition_id = "/providers/Microsoft.Authorization/roleDefinitions/b86a8fe4-44ce-4948-aee5-eccb2c155cd7" #Key vault secret officier
+  principal_id       = azurerm_linux_virtual_machine.my_terraform_vm.identity[0].principal_id
 }
 
 resource "azurerm_key_vault_secret" "add_private_key_to_kv" {
