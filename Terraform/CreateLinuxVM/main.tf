@@ -130,6 +130,11 @@ resource "azurerm_linux_virtual_machine" "my_terraform_vm" {
 
   custom_data = base64encode(<<EOF
   #cloud-config
+  write_files:
+    - content : |
+      new-item -Path "/home/azureadmin/git/$(Get-Date -format "yyyyMMddmmss").txt"
+      path: /home/azureadmin/git/mycommand.ps1
+      permissions: '500'
   runcmd:
     - apt-get -y update
     - wget https://raw.githubusercontent.com/PowerShell/PowerShell/master/tools/install-powershell.sh
@@ -141,6 +146,7 @@ resource "azurerm_linux_virtual_machine" "my_terraform_vm" {
     - mkdir /home/azureadmin/git
     - git clone https://github.com/SCOMnewbie/PSMSALNet /home/azureadmin/git/PSMSALNet
     - git clone "https://${var.gitPat}@github.com/SCOMnewbie/PesterPOC.git" /home/azureadmin/git/PesterPOC
+    - sudo pwsh -command "New-Item -Type File -Path /home/azureadmin/git/fichier.txt"
     - apt-get -y clean
     - apt-get -y autoremove --purge
   package_upgrade: true
