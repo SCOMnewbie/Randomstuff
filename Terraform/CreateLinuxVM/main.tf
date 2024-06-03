@@ -131,24 +131,36 @@ resource "azurerm_linux_virtual_machine" "my_terraform_vm" {
   custom_data = base64encode(<<EOF
   #cloud-config
   write_files:
-    - content : |
-      new-item -Path "/home/azureadmin/git/$(Get-Date -format "yyyyMMddmmss").txt"
-      path: /home/azureadmin/git/mycommand.ps1
-      permissions: '500'
+    - content: |
+        new-item -Path "/home/azureadmin/git/$(Get-Date -format "yyyyMMddmmss").txt"
+      path: "/home/azureadmin/git/mycommand.ps1"
+      permissions: '770'
+    - content: |
+        [Unit]
+        Description=My desc here to run my script
+
+        [Service]
+        ExecStart=pwsh -command "/home/azureadmin/git/mycommand.ps1"
+
+        [Install]
+        WantedBy=multi-user.target
+      path: "/etc/systemd/system/mycommand.service"
+      permissions: '770'
   runcmd:
     - apt-get -y update
+    - usermod -aG sudo azureadmin
+    - sudo systemctl enable mycommand.service
     - wget https://raw.githubusercontent.com/PowerShell/PowerShell/master/tools/install-powershell.sh
     - chmod 755 install-powershell.sh
     - ./install-powershell.sh
-    # Git
     - git config --global user.name "scomnewbie"
     - git config --global user.email "leon.francois75@gmail.com"
-    - mkdir /home/azureadmin/git
     - git clone https://github.com/SCOMnewbie/PSMSALNet /home/azureadmin/git/PSMSALNet
     - git clone "https://${var.gitPat}@github.com/SCOMnewbie/PesterPOC.git" /home/azureadmin/git/PesterPOC
-    - sudo pwsh -command "New-Item -Type File -Path /home/azureadmin/git/fichier.txt"
+    - sudo pwsh -command "Set-PSReadLineOption -HistorySaveStyle SaveNothing"
     - apt-get -y clean
     - apt-get -y autoremove --purge
+    - reboot
   package_upgrade: true
   packages:
   - curl
