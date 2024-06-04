@@ -148,16 +148,14 @@ resource "azurerm_linux_virtual_machine" "my_terraform_vm" {
       permissions: '770'
   runcmd:
     - apt-get -y update
-    - usermod -aG sudo azureadmin
     - sudo systemctl enable mycommand.service
     - wget https://raw.githubusercontent.com/PowerShell/PowerShell/master/tools/install-powershell.sh
     - chmod 755 install-powershell.sh
     - ./install-powershell.sh
+    - sudo chown -R azureadmin: /home/azureadmin
     - git config --global user.name "scomnewbie"
     - git config --global user.email "leon.francois75@gmail.com"
-    - git clone https://github.com/SCOMnewbie/PSMSALNet /home/azureadmin/git/PSMSALNet
     - git clone "https://${var.gitPat}@github.com/SCOMnewbie/PesterPOC.git" /home/azureadmin/git/PesterPOC
-    - sudo pwsh -command "Set-PSReadLineOption -HistorySaveStyle SaveNothing"
     - apt-get -y clean
     - apt-get -y autoremove --purge
     - reboot

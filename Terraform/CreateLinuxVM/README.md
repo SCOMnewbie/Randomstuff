@@ -1,6 +1,11 @@
 https://learn.microsoft.com/en-us/azure/virtual-machines/linux/quick-create-terraform?tabs=azure-cli
 
-docker run -it --rm -v /mnt/c/Git/Public/Randomstuff/Terraform/CreateLinuxVM:/root/scripts ghcr.io/scomnewbie/admintools:latest
+On Windows host, create a env variable called TF_VAR_gitPat with the git PAT as value
+On windows host create a new system variable called WSLENV with value TF_VAR_gitPat
+
+On your WSL instance run:
+
+docker run -it --rm -v /mnt/c/Git/Public/Randomstuff/Terraform/CreateLinuxVM:/root/scripts -e TF_VAR_gitPat=$env:TF_VAR_gitPat ghcr.io/scomnewbie/admintools:latest
 
 az login
 cd /root/scripts/
