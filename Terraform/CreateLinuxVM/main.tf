@@ -152,7 +152,7 @@ resource "azurerm_linux_virtual_machine" "my_terraform_vm" {
     - wget https://raw.githubusercontent.com/PowerShell/PowerShell/master/tools/install-powershell.sh
     - chmod 755 install-powershell.sh
     - ./install-powershell.sh
-    - sudo chown -R azureadmin: /home/azureadmin
+    - sudo chown -R azureadmin /home/azureadmin
     - git config --global user.name "scomnewbie"
     - git config --global user.email "leon.francois75@gmail.com"
     - git clone "https://${var.gitPat}@github.com/SCOMnewbie/PesterPOC.git" /home/azureadmin/git/PesterPOC
