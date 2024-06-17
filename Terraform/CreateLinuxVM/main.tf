@@ -156,8 +156,9 @@ resource "azurerm_linux_virtual_machine" "my_terraform_vm" {
     - git config --global user.name "scomnewbie"
     - git config --global user.email "leon.francois75@gmail.com"
     - git clone "https://${var.gitPat}@github.com/SCOMnewbie/PesterPOC.git" /home/azureadmin/git/PesterPOC
-    - pwsh -command "Install-module Pester,PSMSALNet,Az.Accounts -Force"
     - curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+    - pwsh -command "Save-Module PSMSALNet -Path /opt/microsoft/powershell/7/Modules"
+    - pwsh -command "Save-Module Pester -Path /opt/microsoft/powershell/7/Modules"
     - apt-get -y clean
     - apt-get -y autoremove --purge
     - reboot
