@@ -8,9 +8,9 @@ throw "Don't press F5"
 # Make sure the base image is up to date on regular basis
 wsl -d Ubuntu-22.04 sudo apt update `&`& sudo apt upgrade   # Make sure to escape the & on powershell
 # export "goldimage"
-wsl --export Ubuntu-22.04 C:\WSL\Updated-Ubuntu2204.vhdx
+wsl --export Ubuntu-22.04 C:\WSL\Updated-Ubuntu2204.vhdx --vhd
 # Create a new wsl sandbox distro
-wsl --import sandbox01 $env:USERPROFILE\.wsl\sandbox01 C:\WSL\Updated-Ubuntu2204.vhdx
+wsl --import sandbox01 $env:USERPROFILE\.wsl\sandbox01 C:\WSL\Updated-Ubuntu2204.vhdx --vhd
 # connect on it
 wsl -d sandbox01
 notepad.exe 
