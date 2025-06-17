@@ -1,3 +1,6 @@
+<#
+  This function is an web API protected by Entra Id without dependencies other than Powershell 7.
+#>
 [CmdletBinding()]
 param(
     [string[]]$ListenerPrefix = @('http://localhost:6161/'),
@@ -5,10 +8,33 @@ param(
     $Audience = 'api://fca4cdf3-031d-41a2-a0be-ecd854b2f201' # Each application has a singla audience
 )
 
+# Load function in memory
+. $PSScriptRoot\blah.ps1
+
 # If we're running in a container and the listener prefix is not http://*:80/,
 if ($env:IN_CONTAINER -and $listenerPrefix -ne 'http://*:80/') {
     # then set the listener prefix to http://*:80/ (listen to all incoming requests on port 80).
     $listenerPrefix = 'http://*:80/'
+}
+
+# Return a 404
+function NotFound {
+    param($context, $Event)
+    $Context.Response.StatusCode = 404
+    $Context.Response.Close()
+    # Remove unwanted events
+    $Event | Remove-Event
+    break
+}
+
+# Return a 403
+function NotAllowed {
+    param($context, $Event)
+    $Context.Response.StatusCode = 403
+    $Context.Response.Close()
+    # Remove unwanted events
+    $Event | Remove-Event
+    break
 }
 
 function Invoke-Middleware {
@@ -18,91 +44,92 @@ function Invoke-Middleware {
     Write-Host "Received request: $($context.Request.HttpMethod) $($context.Request.Url)"
 
     $AllowedURLRegex = '^(?<urlwithport>https?:\/\/[^\s\/]+:\d+)\/(?<route>[^\s\/?]*)\/{0,1}(?<parameters>[^\s?]*)$'
+    #Get URL information
     $Context.Request.Url -match $AllowedURLRegex | out-null
     $UrlWithPort = $matches["urlwithport"]
     $Route = $matches["route"] # Is null for /
-    $parameters = $matches["parameters"] # Can be for now /blah/blih/bloh
+    $Parameters = $matches["parameters"] # Can be for now /blah/blih/bloh
     $IsAdminRequired = $false
-    $AdminRole = 'NoAuthZ'
+    $AdminRole, $FunctionToCall = 'NoAuthZ'
 
-    #Validate valide route
+    #Declare all your routes. This pattern avoid security hole (all routes must be declared).
+    # This is where you defined if you need AuthZ
     switch ($Route) {
         '' {
-            Write-host "Route / has been request" -ForegroundColor Yellow
+            Write-host "Call / function" -ForegroundColor Yellow
+            $script:FunctionToCall = '/'
         }
         'blah' {
-            Write-host "Route /blah has been request" -ForegroundColor Yellow
+            Write-host "Call /blah function" -ForegroundColor Yellow
+            $script:FunctionToCall = 'blah'
         }
         'admin' {
+            # This is how we declare this route require AuthZ
             $IsAdminRequired = $true
+            # This is the role claim we're waiting for in the token
             $AdminRole = 'SuperAdmin'
-            Write-host "Route /admin has been request" -ForegroundColor Yellow
+            Write-host "Call /admin function" -ForegroundColor Yellow
+            $script:FunctionToCall = '/admin'
+            break
+        }
+        'fakeAdmin' {
+            # This is how we declare this route require AuthZ
+            $IsAdminRequired = $true
+            # This is the role claim we're waiting for in the token
+            $AdminRole = 'FakeSuperAdmin'
+            Write-host "Call /fakeAdmin function" -ForegroundColor Yellow
             break
         }
         Default {
             Write-host "$Route is not an allowed route" -ForegroundColor Red
-            $Context.Response.StatusCode = 404
-            $Context.Response.Close()
-            # Remove unwanted events
-            $Event | Remove-Event
-            break
+            NotFound -context $context -Event $Event
         }
     }
 
+    # This is where you validate the required AuthZ
     if ($IsAdminRequired) {
+        # This is an admin route (AuthZ required)
+        # Let's grab the Authorization header (Entra token)
         $AuthorizationHeader = $context.Request.Headers['Authorization']
         # Test signature first will always return true or false. False means this is a forged token not an official one.
-        if (Test-AADJWTSignature -Token $AuthorizationHeader -TenantId $TenanId) {
+        #TODO: bulletproof the test signature to not kill the webserver
+        if (Test-AADJWTSignature -Token $AuthorizationHeader -TenantId $TenantId -ErrorAction SilentlyContinue) {
             $DecodedToken = ConvertFrom-Jwt -Token $AuthorizationHeader
-            # This token is not for another app
+            # Let's make sure this token is not for another app
             if ($DecodedToken.Tokenpayload.aud -ne $Audience) {
-                $Context.Response.StatusCode = 403
-                $Context.Response.Close()
-                # Remove unwanted events
-                $Event | Remove-Event
-                break
+                NotAllowed -context $context -Event $Event
             }
 
+            # For this application, we may have multiple roles exposed by Entra Id
             switch ($AdminRole) {
+                # Make sure you declare all you application roles. If not 403 will be return with a small log on server side.
                 'SuperAdmin' {
-                    try {
-                        if ('SuperAdmin' -notin $DecodedToken.TokenPayload.roles) {
-                            # If role is not in the list drop
-                            $Context.Response.StatusCode = 403
-                            $Context.Response.Close()
-                            # Remove unwanted events
-                            $Event | Remove-Event
-                            break
-                        }
+                    if ('SuperAdmin' -notin $DecodedToken.TokenPayload.roles) {
+                        NotAllowed -context $context -Event $Event
                     }
-                    catch {
-                        $_.Exception.Message
-                    }
-                    
-                    write-host "Authz : $AuthZ"
                 }
                 Default {
-    
+                    Write-host "Admin role $AdminRole is not defined in the API make sure to proper configure your API" -ForegroundColor Red
+                    NotAllowed -context $context -Event $Event
                 }
             }
         }
         else {
             Write-host "Forged token is not allowed" -ForegroundColor Red
-            $Context.Response.StatusCode = 404
-            $Context.Response.Close()
-            # Remove unwanted events
-            $Event | Remove-Event
-            break
+            NotFound -context $context -Event $Event
         }
     }
-    else {
-        Write-host "Route does not require AuthN/AuthZ" -ForegroundColor Red
+    
+    return [pscustomobject]@{
+        Context     = $context
+        UrlWithPort = $UrlWithPort
+        Route       = $Route
+        Parameters  = $Parameters
     }
-
-    return $context
+    #return $context
 }
 
-# If we do not have a global HttpListener object,   
+# If we do not have a global HttpListener object
 if (-not $global:HttpListener) {
     # then create a new HttpListener object.
     $global:HttpListener = [Net.HttpListener]::new()
@@ -165,13 +192,36 @@ while ($Httplistener.IsListening) {
     foreach ($Event in @(Get-Event HTTP*)) {
         $Context, $Request, $Response = $Event.SourceArgs
 
-        $context = Invoke-Middleware -context $context -Event $Event
+        #TODO: Modify the middleware function to return both context And the extra properties route/UrlWithPort/parameters to avoid duplicate the code
+        $RequestInfo = Invoke-Middleware -context $context -Event $Event
 
         #If not processed, let's keep it into the buffer
+        # continue if 404/403 is return
         if (-not $Response.OutputStream) { continue }
 
-        $Response.Close($OutputEncoding.GetBytes("$($Rng.Next())"), $false)
+        switch ($RequestInfo.Route) {
+            'blah' {
+                $Json = blah -ItemCount $RequestInfo.Parameters
+                $Response.Close($OutputEncoding.GetBytes($Json), $false)
+                
+             }
+            Default {
+                $Response.Close($OutputEncoding.GetBytes("$($Rng.Next())"), $false)
+            }
+        }
+
         Write-host "Responded to $($Request.Url) in $([datetime]::Now - $Event.TimeGenerated)" -ForegroundColor Cyan
         $Event | Remove-Event
     }
+
+    <#
+    # Wait for the PowerShell.Exiting event.
+    $exiting = Wait-Event -SourceIdentifier PowerShell.Exiting -Timeout (Get-Random -Minimum 1 -Maximum 5)
+    if ($exiting) {
+        # If the Stop the web server is still running, stop it.
+        $Jobname | Stop-Job
+        # and break out of the loop.
+        break
+    }
+    #>
 }
