@@ -1,4 +1,4 @@
-function blah {
+function useexternalfunction {
     param (
         [int]$ItemCount = 5
     )

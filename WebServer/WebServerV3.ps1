@@ -9,7 +9,7 @@ param(
 )
 
 # Load function in memory
-. $PSScriptRoot\blah.ps1
+. $PSScriptRoot\useexternalfunction.ps1
 
 # If we're running in a container and the listener prefix is not http://*:80/,
 if ($env:IN_CONTAINER -and $listenerPrefix -ne 'http://*:80/') {
@@ -50,18 +50,18 @@ function Invoke-Middleware {
     $Route = $matches["route"] # Is null for /
     $Parameters = $matches["parameters"] # Can be for now /blah/blih/bloh
     $IsAdminRequired = $false
-    $AdminRole, $FunctionToCall = 'NoAuthZ'
+    $AdminRole = 'NoAuthZ'
 
     #Declare all your routes. This pattern avoid security hole (all routes must be declared).
     # This is where you defined if you need AuthZ
     switch ($Route) {
         '' {
             Write-host "Call / function" -ForegroundColor Yellow
-            $script:FunctionToCall = '/'
+            break
         }
-        'blah' {
-            Write-host "Call /blah function" -ForegroundColor Yellow
-            $script:FunctionToCall = 'blah'
+        'useexternalfunction' {
+            Write-host "Call /useexternalfunction function" -ForegroundColor Yellow
+            break
         }
         'admin' {
             # This is how we declare this route require AuthZ
@@ -69,13 +69,12 @@ function Invoke-Middleware {
             # This is the role claim we're waiting for in the token
             $AdminRole = 'SuperAdmin'
             Write-host "Call /admin function" -ForegroundColor Yellow
-            $script:FunctionToCall = '/admin'
             break
         }
         'fakeAdmin' {
             # This is how we declare this route require AuthZ
             $IsAdminRequired = $true
-            # This is the role claim we're waiting for in the token
+            # This is the role claim we're waiting for in the token. For demo purpose, the role does not exist in the application.
             $AdminRole = 'FakeSuperAdmin'
             Write-host "Call /fakeAdmin function" -ForegroundColor Yellow
             break
@@ -95,7 +94,7 @@ function Invoke-Middleware {
         #TODO: bulletproof the test signature to not kill the webserver
         if (Test-AADJWTSignature -Token $AuthorizationHeader -TenantId $TenantId -ErrorAction SilentlyContinue) {
             $DecodedToken = ConvertFrom-Jwt -Token $AuthorizationHeader
-            # Let's make sure this token is not for another app
+            # Let's make sure this token is not for another app. If this is the case, drop the request
             if ($DecodedToken.Tokenpayload.aud -ne $Audience) {
                 NotAllowed -context $context -Event $Event
             }
@@ -178,21 +177,23 @@ Add-Member -NotePropertyMembers ([Ordered]@{HttpListener = $Httplistener }) -Pas
 
 Write-host "Now serving $Jobname" -ForegroundColor Green
 
+<#
 # If PowerShell is exiting, close the HttpListener.
 Register-EngineEvent -SourceIdentifier PowerShell.Exiting -Action {
     $global:Httplistener.Close()
 }
+#>
 
 # Keep track of the creation time of the DiceServerJob.
 $ServerJob | Add-Member -MemberType NoteProperty Created -Value ([DateTime]::now) -Force
-
-$Rng = [System.Random]::new()
 
 while ($Httplistener.IsListening) {
     foreach ($Event in @(Get-Event HTTP*)) {
         $Context, $Request, $Response = $Event.SourceArgs
 
-        #TODO: Modify the middleware function to return both context And the extra properties route/UrlWithPort/parameters to avoid duplicate the code
+        $ShouldExit = $false
+
+        # Modify the middleware function to return both context And the extra properties route/UrlWithPort/parameters to avoid duplicate the code
         $RequestInfo = Invoke-Middleware -context $context -Event $Event
 
         #If not processed, let's keep it into the buffer
@@ -200,18 +201,49 @@ while ($Httplistener.IsListening) {
         if (-not $Response.OutputStream) { continue }
 
         switch ($RequestInfo.Route) {
-            'blah' {
-                $Json = blah -ItemCount $RequestInfo.Parameters
-                $Response.Close($OutputEncoding.GetBytes($Json), $false)
+            '' {
+                # / Can't have parameter (become a route if provided)
+                # Generate a random JSON object because why not
+                $randomObject = @{
+                    Id        = [guid]::NewGuid().ToString()
+                    Timestamp = (Get-Date).ToString("o")
+                    Status    = Get-Random -InputObject @("Active", "Inactive", "Pending")
+                    Score     = Get-Random -Minimum 1 -Maximum 100
+                    Tags      = @("alpha", "beta", "gamma") | Get-Random -Count 2
+                } | ConvertTo-Json -Depth 3
+
+                $Response.Close($OutputEncoding.GetBytes($randomObject), $false)
+                break
+            }
+            'useexternalfunction' {
+                # Load an external function from an external file
+                if($RequestInfo.Parameters -match '^\d+$' ){
+                    # This function accept only integer
+                    $Json = useexternalfunction -ItemCount $RequestInfo.Parameters
+                    $Response.Close($OutputEncoding.GetBytes($Json), $false)
+                    # Don't forget to log the result somewhere
+                }
+                else{
+                    # Parameter is not validated
+                    # IMPORTANT make sure this variable is assigned BEFORE the NotFound function
+                    $ShouldExit = $true
+                    # return 404 if user provide bad parameters
+                    NotFound -context $context -Event $Event
+                }
                 
-             }
+                
+            }
             Default {
-                $Response.Close($OutputEncoding.GetBytes("$($Rng.Next())"), $false)
+                # Should never go there. A none declared route is managed by the middleware (default)
+                $Response.Close($OutputEncoding.GetBytes("Should never go there"), $false)
             }
         }
 
-        Write-host "Responded to $($Request.Url) in $([datetime]::Now - $Event.TimeGenerated)" -ForegroundColor Cyan
-        $Event | Remove-Event
+        # If parameter is not validated, skip this step
+        if(-not $ShouldExit){
+            Write-host "Responded to $($Request.Url) in $([datetime]::Now - $Event.TimeGenerated)" -ForegroundColor Cyan
+            $Event | Remove-Event
+        } 
     }
 
     <#
