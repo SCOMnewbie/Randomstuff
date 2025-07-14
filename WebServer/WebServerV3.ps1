@@ -1,41 +1,16 @@
 <#
-  This function is an web API protected by Entra Id without dependencies other than Powershell 7.
+  This function is an web API protected by Entra Id without dependencies other than Powershell 7, ValidateAADJWT for token validation.
 #>
 [CmdletBinding()]
 param(
     [string[]]$ListenerPrefix = @('http://localhost:6161/'),
     $TenantId = 'e192cada-a04d-4cfc-8b90-d14338b2c7ec', # Azure Tenant Id
-    $Audience = 'api://fca4cdf3-031d-41a2-a0be-ecd854b2f201' # Each application has a singla audience
+    $Audience = 'api://fca4cdf3-031d-41a2-a0be-ecd854b2f201' # Each application has a single audience
 )
 
 # Load function in memory
+. $PSScriptRoot\CommonFunctions.ps1
 . $PSScriptRoot\useexternalfunction.ps1
-
-# If we're running in a container and the listener prefix is not http://*:80/,
-if ($env:IN_CONTAINER -and $listenerPrefix -ne 'http://*:80/') {
-    # then set the listener prefix to http://*:80/ (listen to all incoming requests on port 80).
-    $listenerPrefix = 'http://*:80/'
-}
-
-# Return a 404
-function NotFound {
-    param($context, $Event)
-    $Context.Response.StatusCode = 404
-    $Context.Response.Close()
-    # Remove unwanted events
-    $Event | Remove-Event
-    break
-}
-
-# Return a 403
-function NotAllowed {
-    param($context, $Event)
-    $Context.Response.StatusCode = 403
-    $Context.Response.Close()
-    # Remove unwanted events
-    $Event | Remove-Event
-    break
-}
 
 function Invoke-Middleware {
     param($context, $Event)
@@ -52,15 +27,15 @@ function Invoke-Middleware {
     $IsAdminRequired = $false
     $AdminRole = 'NoAuthZ'
 
-    #Declare all your routes. This pattern avoid security hole (all routes must be declared).
-    # This is where you defined if you need AuthZ
+    # Declare all your routes. This pattern avoid security hole (all routes must be declared).
+    # This is where you defined if you need AuthZ. If you need admin role, make sure you set $IsAdminRequired to $true and define $AdminRole with the proper role.
     switch ($Route) {
         '' {
-            Write-host "Call / function" -ForegroundColor Yellow
+            Write-host "[middleware] Call / function Admin role not required" -ForegroundColor Yellow
             break
         }
         'useexternalfunction' {
-            Write-host "Call /useexternalfunction function" -ForegroundColor Yellow
+            Write-host "[middleware] Call /useexternalfunction function Admin role not required" -ForegroundColor Yellow
             break
         }
         'admin' {
@@ -68,7 +43,7 @@ function Invoke-Middleware {
             $IsAdminRequired = $true
             # This is the role claim we're waiting for in the token
             $AdminRole = 'SuperAdmin'
-            Write-host "Call /admin function" -ForegroundColor Yellow
+            Write-host "[middleware] Call /admin function SuperAdmin role is required" -ForegroundColor Yellow
             break
         }
         'fakeAdmin' {
@@ -76,11 +51,11 @@ function Invoke-Middleware {
             $IsAdminRequired = $true
             # This is the role claim we're waiting for in the token. For demo purpose, the role does not exist in the application.
             $AdminRole = 'FakeSuperAdmin'
-            Write-host "Call /fakeAdmin function" -ForegroundColor Yellow
+            Write-host "[middleware] Call /fakeAdmin function FakeSuperAdmin role is required" -ForegroundColor Yellow
             break
         }
         Default {
-            Write-host "$Route is not an allowed route" -ForegroundColor Red
+            Write-host "[middleware] $Route is not an allowed route" -ForegroundColor Red
             NotFound -context $context -Event $Event
         }
     }
@@ -90,13 +65,13 @@ function Invoke-Middleware {
         # This is an admin route (AuthZ required)
         # Let's grab the Authorization header (Entra token)
         $AuthorizationHeader = $context.Request.Headers['Authorization']
-        # Test signature first will always return true or false. False means this is a forged token not an official one.
-        #TODO: bulletproof the test signature to not kill the webserver
-        if (Test-AADJWTSignature -Token $AuthorizationHeader -TenantId $TenantId -ErrorAction SilentlyContinue) {
+        # Test signature first will always return true or false. False means this is a forged token not an official one. Try catch to avoid blocking the webserver.
+        $IsValidToken = try { Test-AADJWTSignature -Token $AuthorizationHeader -TenantId $TenantId }catch { $IsValidToken = $false }
+        if ($IsValidToken) {
             $DecodedToken = ConvertFrom-Jwt -Token $AuthorizationHeader
             # Let's make sure this token is not for another app. If this is the case, drop the request
             if ($DecodedToken.Tokenpayload.aud -ne $Audience) {
-                NotAllowed -context $context -Event $Event
+                Forbidden -context $context -Event $Event
             }
 
             # For this application, we may have multiple roles exposed by Entra Id
@@ -104,18 +79,18 @@ function Invoke-Middleware {
                 # Make sure you declare all you application roles. If not 403 will be return with a small log on server side.
                 'SuperAdmin' {
                     if ('SuperAdmin' -notin $DecodedToken.TokenPayload.roles) {
-                        NotAllowed -context $context -Event $Event
+                        Forbidden -context $context -Event $Event
                     }
                 }
                 Default {
                     Write-host "Admin role $AdminRole is not defined in the API make sure to proper configure your API" -ForegroundColor Red
-                    NotAllowed -context $context -Event $Event
+                    Forbidden -context $context -Event $Event
                 }
             }
         }
         else {
             Write-host "Forged token is not allowed" -ForegroundColor Red
-            NotFound -context $context -Event $Event
+            Unauthorized -context $context -Event $Event
         }
     }
     
@@ -152,9 +127,6 @@ try { $Httplistener.Start() }
 # If the listener cannot start, write a warning and return.
 catch { Write-Warning "Could not start listener: $_" ; return }
 
-Write-verbose "Jobname: $Jobname"
-Write-verbose "HttpListener: $HttpListener"
-
 # The ServerJob will start the HttpListener and listen for incoming requests.
 $script:ServerJob = Start-ThreadJob -ScriptBlock {
     param($MainRunspace, $Httplistener, $SourceIdentifier = 'http')
@@ -177,14 +149,7 @@ Add-Member -NotePropertyMembers ([Ordered]@{HttpListener = $Httplistener }) -Pas
 
 Write-host "Now serving $Jobname" -ForegroundColor Green
 
-<#
-# If PowerShell is exiting, close the HttpListener.
-Register-EngineEvent -SourceIdentifier PowerShell.Exiting -Action {
-    $global:Httplistener.Close()
-}
-#>
-
-# Keep track of the creation time of the DiceServerJob.
+# Keep track of the creation time of the ServerJob.
 $ServerJob | Add-Member -MemberType NoteProperty Created -Value ([DateTime]::now) -Force
 
 while ($Httplistener.IsListening) {
@@ -217,21 +182,19 @@ while ($Httplistener.IsListening) {
             }
             'useexternalfunction' {
                 # Load an external function from an external file
-                if($RequestInfo.Parameters -match '^\d+$' ){
+                if ($RequestInfo.Parameters -match '^\d+$' ) {
                     # This function accept only integer
                     $Json = useexternalfunction -ItemCount $RequestInfo.Parameters
                     $Response.Close($OutputEncoding.GetBytes($Json), $false)
                     # Don't forget to log the result somewhere
                 }
-                else{
+                else {
                     # Parameter is not validated
                     # IMPORTANT make sure this variable is assigned BEFORE the NotFound function
                     $ShouldExit = $true
                     # return 404 if user provide bad parameters
                     NotFound -context $context -Event $Event
                 }
-                
-                
             }
             Default {
                 # Should never go there. A none declared route is managed by the middleware (default)
@@ -240,7 +203,7 @@ while ($Httplistener.IsListening) {
         }
 
         # If parameter is not validated, skip this step
-        if(-not $ShouldExit){
+        if (-not $ShouldExit) {
             Write-host "Responded to $($Request.Url) in $([datetime]::Now - $Event.TimeGenerated)" -ForegroundColor Cyan
             $Event | Remove-Event
         } 
@@ -257,3 +220,5 @@ while ($Httplistener.IsListening) {
     }
     #>
 }
+
+# Measure-Command -Expression{ (0..1000).ForEach({irm http://localhost:6161/})}
