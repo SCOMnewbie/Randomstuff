@@ -13,8 +13,8 @@ param(
 . $PSScriptRoot\CommonFunctions.ps1
 . $PSScriptRoot\useexternalfunction.ps1
 
-$BackendLogFileName = "Backend_{0}.log" -f $(Get-Date -Format "yyyy-MM-dd")
-$RequestLogFileName = "Request_{0}.log" -f $(Get-Date -Format "yyyy-MM-dd")
+$BackendLogFileName = 'Backend_{0}.log' -f $(Get-Date -Format 'yyyy-MM-dd')
+$RequestLogFileName = 'Request_{0}.log' -f $(Get-Date -Format 'yyyy-MM-dd')
 $BackendLogFilePath = Join-Path $([System.IO.Path]::GetTempPath()) $LogFolderName $BackendLogFileName
 $RequestLogFilePath = Join-Path $([System.IO.Path]::GetTempPath()) $LogFolderName $RequestLogFileName
 
@@ -26,13 +26,21 @@ function Invoke-Middleware {
     
     # Log request details
     Write-BackendLog -LogFilePath $BackendLogFilePath -LogLevel INFO -HostColor White -Message "Received request: $($context.Request.HttpMethod) $($context.Request.Url)"
+    
+    $Authority = $context.Request.Url.Authority #localhost:6161
+    $AbsolutePath = $context.Request.Url.AbsolutePath #/admin/54325345 or /
+    $AbsoluteUri = $context.Request.Url.AbsoluteUri #http://localhost:6161/admin/54325345
+    $QueryParameter = $context.Request.Url.Query.ToString().replace('?','') #?param1=value1&param2=value2 can be empty
+    $PathAndQuery = $context.Request.Url.PathAndQuery #/admin/54325345?param1=value1&param2=value2, /, /admin
 
-    $AllowedURLRegex = '^(?<urlwithport>https?:\/\/[^\s\/]+:\d+)\/(?<route>[^\s\/?]*)\/{0,1}(?<parameters>[^\s?]*)$'
-    #Get URL information
-    $Context.Request.Url -match $AllowedURLRegex | out-null
-    $UrlWithPort = $matches["urlwithport"]
-    $Route = $matches["route"] # Is null for /
-    $Parameters = $matches["parameters"] # Can be for now /blah/blih/bloh
+    $Route = $context.Request.Url.Segments[1]
+    if($null -ne $Route){
+        $Route = $Route.TrimEnd('/') # Remove trailing slash if any
+    }
+    else {
+        $Route = '' # If no segment, set to empty string
+    } # This is the first segment of the URL after the host, e.g., 'admin' or 'useexternalfunction'
+
     $IsAdminRequired = $false
     $AdminRole = 'NoAuthZ'
 
@@ -40,11 +48,11 @@ function Invoke-Middleware {
     # This is where you defined if you need AuthZ. If you need admin role, make sure you set $IsAdminRequired to $true and define $AdminRole with the proper role.
     switch ($Route) {
         '' {
-            Write-BackendLog -LogFilePath $BackendLogFilePath -LogLevel INFO -HostColor Yellow -Message "[middleware] Call / function Admin role not required"
+            Write-BackendLog -LogFilePath $BackendLogFilePath -LogLevel INFO -HostColor Yellow -Message '[middleware] Call / function Admin role not required'
             break
         }
         'useexternalfunction' {
-            Write-BackendLog -LogFilePath $BackendLogFilePath -LogLevel INFO -HostColor Yellow -Message "[middleware] Call /useexternalfunction function Admin role not required"
+            Write-BackendLog -LogFilePath $BackendLogFilePath -LogLevel INFO -HostColor Yellow -Message '[middleware] Call /useexternalfunction function Admin role not required'
             break
         }
         'admin' {
@@ -63,9 +71,9 @@ function Invoke-Middleware {
             Write-BackendLog -LogFilePath $BackendLogFilePath -LogLevel INFO -HostColor Yellow -Message "[middleware] Call /fakeAdmin function $AdminRole role is required"
             break
         }
-        Default {
+        default {
             Write-BackendLog -LogFilePath $BackendLogFilePath -LogLevel WARNING -HostColor Red -Message "[middleware] $Route is not an allowed route"
-            NotFound -context $context -Event $Event
+            NotFound -context $context -Event $Event -QueryParameter $QueryParameter -RequestLogFilePath $RequestLogFilePath
         }
     }
 
@@ -80,7 +88,7 @@ function Invoke-Middleware {
             $DecodedToken = ConvertFrom-Jwt -Token $AuthorizationHeader
             # Let's make sure this token is not for another app. If this is the case, drop the request
             if ($DecodedToken.Tokenpayload.aud -ne $Audience) {
-                Forbidden -context $context -Event $Event
+                Forbidden -context $context -Event $Event -QueryParameter $QueryParameter -RequestLogFilePath $RequestLogFilePath
             }
 
             # For this application, we may have multiple roles exposed by Entra Id
@@ -88,26 +96,29 @@ function Invoke-Middleware {
                 # Make sure you declare all you application roles. If not 403 will be return with a small log on server side.
                 'SuperAdmin' {
                     if ('SuperAdmin' -notin $DecodedToken.TokenPayload.roles) {
-                        Forbidden -context $context -Event $Event
+                        Forbidden -context $context -Event $Event -QueryParameter $QueryParameter -RequestLogFilePath $RequestLogFilePath
                     }
                 }
-                Default {
+                default {
                     Write-BackendLog -LogFilePath $BackendLogFilePath -LogLevel ERROR -HostColor Red -Message "Admin role $AdminRole is not defined in the API make sure to proper configure your API"
-                    Forbidden -context $context -Event $Event
+                    Forbidden -context $context -Event $Event -QueryParameter $QueryParameter -RequestLogFilePath $RequestLogFilePath
                 }
             }
         }
         else {
-            Write-BackendLog -LogFilePath $BackendLogFilePath -LogLevel WARNING -HostColor Red -Message "Forged token is not allowed"
-            Unauthorized -context $context -Event $Event
+            Write-BackendLog -LogFilePath $BackendLogFilePath -LogLevel WARNING -HostColor Red -Message 'Forged token is not allowed'
+            Unauthorized -context $context -Event $Event -QueryParameter $QueryParameter -RequestLogFilePath $RequestLogFilePath
         }
     }
     
     return [pscustomobject]@{
-        Context     = $context
-        UrlWithPort = $UrlWithPort
-        Route       = $Route
-        Parameters  = $Parameters
+        Context      = $context
+        Route        = $Route
+        Authority    = $Authority
+        AbsolutePath = $AbsolutePath
+        AbsoluteUri  = $AbsoluteUri
+        Query        = $Query
+        PathAndQuery = $PathAndQuery
     }
 }
 
@@ -133,7 +144,7 @@ else {
 # Start the listener.
 try { $Httplistener.Start() }
 # If the listener cannot start, write a warning and return.
-catch { Write-BackendLog -LogFilePath $BackendFilePath -LogLevel ERROR -HostColor Red -Message "Could not start listener: $_" ; return} 
+catch { Write-BackendLog -LogFilePath $BackendLogFilePath -LogLevel ERROR -HostColor Red -Message "Could not start listener: $_" ; return } 
 
 # The ServerJob will start the HttpListener and listen for incoming requests.
 $script:ServerJob = Start-ThreadJob -ScriptBlock {
@@ -153,13 +164,10 @@ $script:ServerJob = Start-ThreadJob -ScriptBlock {
         )
     }
 } -Name $Jobname -ArgumentList ([runspace]::DefaultRunspace, $Httplistener) -ThrottleLimit 100 | 
-Add-Member -NotePropertyMembers ([Ordered]@{HttpListener = $Httplistener }) -PassThru
+    Add-Member -NotePropertyMembers ([Ordered]@{HttpListener = $Httplistener }) -PassThru
 
 #Write-host "Now serving $Jobname" -ForegroundColor Green
-Write-BackendLog -LogFilePath $BackendLogFilePath -LogLevel INFO -HostColor Green -Message "Now serving $Jobname"
-
-# Keep track of the creation time of the ServerJob.
-$ServerJob | Add-Member -MemberType NoteProperty Created -Value ([DateTime]::now) -Force
+Write-BackendLog -LogFilePath $BackendLogFilePath -LogLevel INFO -HostColor Green -Message "Now serving $Jobname at $([DateTime]::now)"
 
 while ($Httplistener.IsListening) {
     foreach ($Event in @(Get-Event HTTP*)) {
@@ -180,10 +188,10 @@ while ($Httplistener.IsListening) {
                 # Generate a random JSON object because why not
                 $randomObject = @{
                     Id        = [guid]::NewGuid().ToString()
-                    Timestamp = (Get-Date).ToString("o")
-                    Status    = Get-Random -InputObject @("Active", "Inactive", "Pending")
+                    Timestamp = (Get-Date).ToString('o')
+                    Status    = Get-Random -InputObject @('Active', 'Inactive', 'Pending')
                     Score     = Get-Random -Minimum 1 -Maximum 100
-                    Tags      = @("alpha", "beta", "gamma") | Get-Random -Count 2
+                    Tags      = @('alpha', 'beta', 'gamma') | Get-Random -Count 2
                 } | ConvertTo-Json -Depth 3
 
                 $Response.Close($OutputEncoding.GetBytes($randomObject), $false)
@@ -205,9 +213,9 @@ while ($Httplistener.IsListening) {
                     NotFound -context $context -Event $Event
                 }
             }
-            Default {
+            default {
                 # Should never go there. A none declared route is managed by the middleware (default)
-                $Response.Close($OutputEncoding.GetBytes("Should never go there"), $false)
+                $Response.Close($OutputEncoding.GetBytes('Should never go there'), $false)
             }
         }
 
@@ -216,7 +224,7 @@ while ($Httplistener.IsListening) {
             #Write-host "Responded to $($Request.Url) in $([datetime]::Now - $Event.TimeGenerated)" -ForegroundColor Cyan
             Write-BackendLog -LogFilePath $BackendLogFilePath -LogLevel INFO -HostColor Cyan -Message "Responded to $($Request.Url) in $([datetime]::Now - $Event.TimeGenerated)"
             $Event | Remove-Event
-        } 
+        }
     }
 }
 

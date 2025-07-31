@@ -1,7 +1,8 @@
 # Return a 404
 function NotFound {
-    param($context, $Event)
+    param($context, $Event, $QueryParameter, $RequestLogFilePath)
     $Context.Response.StatusCode = 404
+    Write-RequestLog -Context $Context -QueryParameter $QueryParameter -LogFilePath $RequestLogFilePath
     $Context.Response.Close()
     # Remove unwanted events
     $Event | Remove-Event
@@ -10,8 +11,9 @@ function NotFound {
 
 # Return a 403 (I know who you are but not allowed)
 function Forbidden {
-    param($context, $Event)
+    param($context, $Event, $QueryParameter, $RequestLogFilePath)
     $Context.Response.StatusCode = 403
+    Write-RequestLog -Context $Context -QueryParameter $QueryParameter -LogFilePath $RequestLogFilePath
     $Context.Response.Close()
     # Remove unwanted events
     $Event | Remove-Event
@@ -20,8 +22,9 @@ function Forbidden {
 
 # Return a 401 (I don't know you get out)
 function Unauthorized {
-    param($context, $Event)
+    param($Context, $Event, $QueryParameter, $RequestLogFilePath)
     $Context.Response.StatusCode = 401
+    Write-RequestLog -Context $Context -QueryParameter $QueryParameter -LogFilePath $RequestLogFilePath
     $Context.Response.Close()
     # Remove unwanted events
     $Event | Remove-Event
@@ -35,9 +38,10 @@ function Write-RequestLog {
         [ValidateNotNullOrEmpty()]
         [string]$LogFilePath,
         $Context,
+        $QueryParameter,
         [Parameter()]
         [ValidateSet("Black", "DarkBlue", "DarkGreen", "DarkCyan", "DarkRed", "DarkMagenta", "DarkYellow", "Gray", "DarkGray", "Blue", "Green", "Cyan", "Red", "Magenta", "Yellow", "White")]
-        [string]$HostColor = 'White'
+        [string]$HostColor = 'Magenta'
     )
 
     begin {
@@ -61,8 +65,8 @@ function Write-RequestLog {
                     "##Fields: date time s-ip cs-method cs-uri-stem cs-uri-query s-port cs-username c-ip cs(User-Agent) cs(Referer) sc-status sc-substatus sc-win32-status time-taken" | Out-File -FilePath $LogFilePath -Force -Encoding utf8
                 }
 
-                ##Fields: date,time,s-ip,cs-method,cs-uri-stem cs-uri-query s-port cs-username c-ip cs(User-Agent) cs(Referer) sc-status sc-substatus sc-win32-status time-taken
-                $LogEntry = "{0},{1},{2},{3},{4}" -f $(get-date -Format yyyy-MM-dd),$(get-date -Format HH:mm:ss),$context.Request.UserHostAddress,$context.Request.HttpMethod,$Context.Request.RawUrl
+                ##Fields: date,time,s-ip,cs-method,cs-uri-stem cs-uri-query s-port ->>>> cs-username c-ip cs(User-Agent) cs(Referer) sc-status sc-substatus sc-win32-status time-taken
+                $LogEntry = "{0},{1},{2},{3},{4},{5},{6}" -f $(get-date -Format yyyy-MM-dd),$(get-date -Format HH:mm:ss),$context.Request.UserHostAddress,$context.Request.HttpMethod,$Context.Request.RawUrl,$QueryParameter,$context.Request.LocalEndPoint.port 
 
                 Add-Content -Path $LogFilePath -Value $LogEntry
                 Write-Host $logEntry -ForegroundColor $HostColor
