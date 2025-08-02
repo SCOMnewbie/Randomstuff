@@ -223,6 +223,7 @@ while ($Httplistener.IsListening) {
         if (-not $ShouldExit) {
             #Write-host "Responded to $($Request.Url) in $([datetime]::Now - $Event.TimeGenerated)" -ForegroundColor Cyan
             Write-BackendLog -LogFilePath $BackendLogFilePath -LogLevel INFO -HostColor Cyan -Message "Responded to $($Request.Url) in $([datetime]::Now - $Event.TimeGenerated)"
+            Write-RequestLog -Context $Context -QueryParameter $QueryParameter -LogFilePath $RequestLogFilePath
             $Event | Remove-Event
         }
     }
@@ -276,141 +277,630 @@ Referer(cs(Referer)) : La page où l’on a cliqué précédemment pour arriver 
 ##Fields: date time s-ip cs-method cs-uri-stem cs-uri-query s-port cs-username c-ip cs(User-Agent) cs(Referer) sc-status sc-substatus sc-win32-status time-taken
 #2025-07-15 21:34:00 192.168.1.10 GET /index.html - 80 - 203.0.113.45 Mozilla/5.0+(Windows+NT+10.0;+Win64;+x64) - 200 0 0 123
 
-<#
-$context
 
+<#
 {
-  "Request": {
-    "AcceptTypes": null,
-    "UserLanguages": null,
-    "Cookies": [],
-    "ContentEncoding": {
-      "Preamble": null,
-      "BodyName": "utf-8",
-      "EncodingName": "Unicode (UTF-8)",
-      "HeaderName": "utf-8",
-      "WebName": "utf-8",
-      "WindowsCodePage": 1200,
-      "IsBrowserDisplay": true,
-      "IsBrowserSave": true,
-      "IsMailNewsDisplay": true,
-      "IsMailNewsSave": true,
-      "IsSingleByte": false,
-      "EncoderFallback": {
-        "DefaultString": "�",
-        "MaxCharCount": 1
-      },
-      "DecoderFallback": {
-        "DefaultString": "�",
-        "MaxCharCount": 1
-      },
-      "IsReadOnly": true,
-      "CodePage": 65001
+  "ComputerName": null,
+  "RunspaceId": "6f4dbdb6-f888-4c26-a7b4-3cfed08458ec",
+  "EventIdentifier": 13,
+  "Sender": {
+    "AuthenticationSchemeSelectorDelegate": null,
+    "ExtendedProtectionSelectorDelegate": null,
+    "AuthenticationSchemes": 32768,
+    "ExtendedProtectionPolicy": {
+      "CustomServiceNames": null,
+      "PolicyEnforcement": 0,
+      "ProtectionScenario": 0,
+      "CustomChannelBinding": null
     },
-    "ContentType": null,
-    "IsLocal": true,
-    "IsWebSocketRequest": false,
-    "KeepAlive": true,
-    "QueryString": [],
-    "RawUrl": "/admin/54325345",
-    "UserAgent": "Mozilla/5.0 (Windows NT 10.0; Microsoft Windows 10.0.26100; fr-FR) PowerShell/7.5.1",
-    "UserHostAddress": "[::1]:6161",
-    "UserHostName": "localhost:6161",
-    "UrlReferrer": null,
-    "Url": "http://localhost:6161/admin/54325345",
-    "ProtocolVersion": {
-      "Major": 1,
-      "Minor": 1,
-      "Build": -1,
-      "Revision": -1,
-      "MajorRevision": -1,
-      "MinorRevision": -1
-    },
-    "ClientCertificateError": null,
-    "RequestTraceIdentifier": "00000000-0000-0000-d800-00400c0000ff",
-    "ContentLength64": 0,
-    "Headers": [
-      "Accept-Encoding",
-      "Authorization",
-      "Host",
-      "User-Agent"
+    "DefaultServiceNames": [
+      "HTTP/localhost",
+      "HTTP/FLO-LAP-109033.ubisoft.org"
     ],
-    "HttpMethod": "GET",
-    "InputStream": {
-      "CanRead": true,
-      "CanWrite": true,
-      "CanSeek": true,
-      "Length": 0,
-      "Position": 0,
-      "CanTimeout": false,
-      "ReadTimeout": null,
-      "WriteTimeout": null
-    },
-    "IsAuthenticated": false,
-    "IsSecureConnection": false,
-    "ServiceName": null,
-    "TransportContext": {},
-    "HasEntityBody": false,
-    "RemoteEndPoint": {
-      "AddressFamily": 23,
-      "Address": {
-        "AddressFamily": 23,
-        "ScopeId": 0,
-        "IsIPv6Multicast": false,
-        "IsIPv6LinkLocal": false,
-        "IsIPv6SiteLocal": false,
-        "IsIPv6Teredo": false,
-        "IsIPv6UniqueLocal": false,
-        "IsIPv4MappedToIPv6": false,
-        "Address": null
+    "Prefixes": [
+      "http://localhost:6161/"
+    ],
+    "Realm": null,
+    "IsListening": true,
+    "IgnoreWriteExceptions": false,
+    "UnsafeConnectionNtlmAuthentication": false,
+    "TimeoutManager": {
+      "EntityBody": {
+        "Ticks": 0,
+        "Days": 0,
+        "Hours": 0,
+        "Milliseconds": 0,
+        "Microseconds": 0,
+        "Nanoseconds": 0,
+        "Minutes": 0,
+        "Seconds": 0,
+        "TotalDays": 0.0,
+        "TotalHours": 0.0,
+        "TotalMilliseconds": 0.0,
+        "TotalMicroseconds": 0.0,
+        "TotalNanoseconds": 0.0,
+        "TotalMinutes": 0.0,
+        "TotalSeconds": 0.0
       },
-      "Port": 57556
-    },
-    "LocalEndPoint": {
-      "AddressFamily": 23,
-      "Address": {
-        "AddressFamily": 23,
-        "ScopeId": 0,
-        "IsIPv6Multicast": false,
-        "IsIPv6LinkLocal": false,
-        "IsIPv6SiteLocal": false,
-        "IsIPv6Teredo": false,
-        "IsIPv6UniqueLocal": false,
-        "IsIPv4MappedToIPv6": false,
-        "Address": null
+      "DrainEntityBody": {
+        "Ticks": 0,
+        "Days": 0,
+        "Hours": 0,
+        "Milliseconds": 0,
+        "Microseconds": 0,
+        "Nanoseconds": 0,
+        "Minutes": 0,
+        "Seconds": 0,
+        "TotalDays": 0.0,
+        "TotalHours": 0.0,
+        "TotalMilliseconds": 0.0,
+        "TotalMicroseconds": 0.0,
+        "TotalNanoseconds": 0.0,
+        "TotalMinutes": 0.0,
+        "TotalSeconds": 0.0
       },
-      "Port": 6161
+      "RequestQueue": {
+        "Ticks": 0,
+        "Days": 0,
+        "Hours": 0,
+        "Milliseconds": 0,
+        "Microseconds": 0,
+        "Nanoseconds": 0,
+        "Minutes": 0,
+        "Seconds": 0,
+        "TotalDays": 0.0,
+        "TotalHours": 0.0,
+        "TotalMilliseconds": 0.0,
+        "TotalMicroseconds": 0.0,
+        "TotalNanoseconds": 0.0,
+        "TotalMinutes": 0.0,
+        "TotalSeconds": 0.0
+      },
+      "IdleConnection": {
+        "Ticks": 0,
+        "Days": 0,
+        "Hours": 0,
+        "Milliseconds": 0,
+        "Microseconds": 0,
+        "Nanoseconds": 0,
+        "Minutes": 0,
+        "Seconds": 0,
+        "TotalDays": 0.0,
+        "TotalHours": 0.0,
+        "TotalMilliseconds": 0.0,
+        "TotalMicroseconds": 0.0,
+        "TotalNanoseconds": 0.0,
+        "TotalMinutes": 0.0,
+        "TotalSeconds": 0.0
+      },
+      "HeaderWait": {
+        "Ticks": 0,
+        "Days": 0,
+        "Hours": 0,
+        "Milliseconds": 0,
+        "Microseconds": 0,
+        "Nanoseconds": 0,
+        "Minutes": 0,
+        "Seconds": 0,
+        "TotalDays": 0.0,
+        "TotalHours": 0.0,
+        "TotalMilliseconds": 0.0,
+        "TotalMicroseconds": 0.0,
+        "TotalNanoseconds": 0.0,
+        "TotalMinutes": 0.0,
+        "TotalSeconds": 0.0
+      },
+      "MinSendBytesPerSecond": 0
     }
   },
-  "User": null,
-  "Response": {
-    "Headers": [],
-    "ContentEncoding": null,
-    "ContentType": null,
-    "SendChunked": false,
-    "ContentLength64": 0,
-    "Cookies": [],
-    "KeepAlive": true,
-    "OutputStream": {
-      "CanRead": false,
-      "CanSeek": false,
-      "CanWrite": true,
-      "Length": null,
-      "Position": null,
-      "CanTimeout": false,
-      "ReadTimeout": null,
-      "WriteTimeout": null
+  "SourceEventArgs": null,
+  "SourceArgs": [
+    {
+      "Request": {
+        "AcceptTypes": null,
+        "UserLanguages": null,
+        "Cookies": [],
+        "ContentEncoding": {
+          "Preamble": null,
+          "BodyName": "utf-8",
+          "EncodingName": "Unicode (UTF-8)",
+          "HeaderName": "utf-8",
+          "WebName": "utf-8",
+          "WindowsCodePage": 1200,
+          "IsBrowserDisplay": true,
+          "IsBrowserSave": true,
+          "IsMailNewsDisplay": true,
+          "IsMailNewsSave": true,
+          "IsSingleByte": false,
+          "EncoderFallback": {
+            "DefaultString": "�",
+            "MaxCharCount": 1
+          },
+          "DecoderFallback": {
+            "DefaultString": "�",
+            "MaxCharCount": 1
+          },
+          "IsReadOnly": true,
+          "CodePage": 65001
+        },
+        "ContentType": null,
+        "IsLocal": true,
+        "IsWebSocketRequest": false,
+        "KeepAlive": true,
+        "QueryString": [],
+        "RawUrl": "/",
+        "UserAgent": "Mozilla/5.0 (Windows NT 10.0; Microsoft Windows 10.0.22631; fr-FR) PowerShell/7.5.2",
+        "UserHostAddress": "[::1]:6161",
+        "UserHostName": "localhost:6161",
+        "UrlReferrer": null,
+        "Url": "http://localhost:6161/",
+        "ProtocolVersion": {
+          "Major": 1,
+          "Minor": 1,
+          "Build": -1,
+          "Revision": -1,
+          "MajorRevision": -1,
+          "MinorRevision": -1
+        },
+        "ClientCertificateError": null,
+        "RequestTraceIdentifier": "00000000-0000-0000-0400-0040080000ff",
+        "ContentLength64": 0,
+        "Headers": [
+          "Accept-Encoding",
+          "Host",
+          "User-Agent"
+        ],
+        "HttpMethod": "GET",
+        "InputStream": {
+          "CanRead": true,
+          "CanWrite": true,
+          "CanSeek": true,
+          "Length": 0,
+          "Position": 0,
+          "CanTimeout": false,
+          "ReadTimeout": null,
+          "WriteTimeout": null
+        },
+        "IsAuthenticated": false,
+        "IsSecureConnection": false,
+        "ServiceName": null,
+        "TransportContext": {},
+        "HasEntityBody": false,
+        "RemoteEndPoint": {
+          "AddressFamily": 23,
+          "Address": {
+            "AddressFamily": 23,
+            "ScopeId": 0,
+            "IsIPv6Multicast": false,
+            "IsIPv6LinkLocal": false,
+            "IsIPv6SiteLocal": false,
+            "IsIPv6Teredo": false,
+            "IsIPv6UniqueLocal": false,
+            "IsIPv4MappedToIPv6": false,
+            "Address": null
+          },
+          "Port": 51882
+        },
+        "LocalEndPoint": {
+          "AddressFamily": 23,
+          "Address": {
+            "AddressFamily": 23,
+            "ScopeId": 0,
+            "IsIPv6Multicast": false,
+            "IsIPv6LinkLocal": false,
+            "IsIPv6SiteLocal": false,
+            "IsIPv6Teredo": false,
+            "IsIPv6UniqueLocal": false,
+            "IsIPv4MappedToIPv6": false,
+            "Address": null
+          },
+          "Port": 6161
+        }
+      },
+      "User": null,
+      "Response": {
+        "Headers": [
+          "Content-Length"
+        ],
+        "ContentEncoding": null,
+        "ContentType": null,
+        "SendChunked": false,
+        "ContentLength64": 189,
+        "Cookies": [],
+        "KeepAlive": true,
+        "OutputStream": null,
+        "RedirectLocation": null,
+        "StatusDescription": "OK",
+        "StatusCode": 200,
+        "ProtocolVersion": {
+          "Major": 1,
+          "Minor": 1,
+          "Build": -1,
+          "Revision": -1,
+          "MajorRevision": -1,
+          "MinorRevision": -1
+        }
+      }
     },
-    "RedirectLocation": null,
-    "StatusDescription": "OK",
-    "StatusCode": 200,
-    "ProtocolVersion": {
-      "Major": 1,
-      "Minor": 1,
-      "Build": -1,
-      "Revision": -1,
-      "MajorRevision": -1,
-      "MinorRevision": -1
+    {
+      "AcceptTypes": null,
+      "UserLanguages": null,
+      "Cookies": [],
+      "ContentEncoding": {
+        "Preamble": null,
+        "BodyName": "utf-8",
+        "EncodingName": "Unicode (UTF-8)",
+        "HeaderName": "utf-8",
+        "WebName": "utf-8",
+        "WindowsCodePage": 1200,
+        "IsBrowserDisplay": true,
+        "IsBrowserSave": true,
+        "IsMailNewsDisplay": true,
+        "IsMailNewsSave": true,
+        "IsSingleByte": false,
+        "EncoderFallback": {
+          "DefaultString": "�",
+          "MaxCharCount": 1
+        },
+        "DecoderFallback": {
+          "DefaultString": "�",
+          "MaxCharCount": 1
+        },
+        "IsReadOnly": true,
+        "CodePage": 65001
+      },
+      "ContentType": null,
+      "IsLocal": true,
+      "IsWebSocketRequest": false,
+      "KeepAlive": true,
+      "QueryString": [],
+      "RawUrl": "/",
+      "UserAgent": "Mozilla/5.0 (Windows NT 10.0; Microsoft Windows 10.0.22631; fr-FR) PowerShell/7.5.2",
+      "UserHostAddress": "[::1]:6161",
+      "UserHostName": "localhost:6161",
+      "UrlReferrer": null,
+      "Url": "http://localhost:6161/",
+      "ProtocolVersion": {
+        "Major": 1,
+        "Minor": 1,
+        "Build": -1,
+        "Revision": -1,
+        "MajorRevision": -1,
+        "MinorRevision": -1
+      },
+      "ClientCertificateError": null,
+      "RequestTraceIdentifier": "00000000-0000-0000-0400-0040080000ff",
+      "ContentLength64": 0,
+      "Headers": [
+        "Accept-Encoding",
+        "Host",
+        "User-Agent"
+      ],
+      "HttpMethod": "GET",
+      "InputStream": {
+        "CanRead": true,
+        "CanWrite": true,
+        "CanSeek": true,
+        "Length": 0,
+        "Position": 0,
+        "CanTimeout": false,
+        "ReadTimeout": null,
+        "WriteTimeout": null
+      },
+      "IsAuthenticated": false,
+      "IsSecureConnection": false,
+      "ServiceName": null,
+      "TransportContext": {},
+      "HasEntityBody": false,
+      "RemoteEndPoint": {
+        "AddressFamily": 23,
+        "Address": {
+          "AddressFamily": 23,
+          "ScopeId": 0,
+          "IsIPv6Multicast": false,
+          "IsIPv6LinkLocal": false,
+          "IsIPv6SiteLocal": false,
+          "IsIPv6Teredo": false,
+          "IsIPv6UniqueLocal": false,
+          "IsIPv4MappedToIPv6": false,
+          "Address": null
+        },
+        "Port": 51882
+      },
+      "LocalEndPoint": {
+        "AddressFamily": 23,
+        "Address": {
+          "AddressFamily": 23,
+          "ScopeId": 0,
+          "IsIPv6Multicast": false,
+          "IsIPv6LinkLocal": false,
+          "IsIPv6SiteLocal": false,
+          "IsIPv6Teredo": false,
+          "IsIPv6UniqueLocal": false,
+          "IsIPv4MappedToIPv6": false,
+          "Address": null
+        },
+        "Port": 6161
+      }
+    },
+    {
+      "Headers": [
+        "Content-Length"
+      ],
+      "ContentEncoding": null,
+      "ContentType": null,
+      "SendChunked": false,
+      "ContentLength64": 189,
+      "Cookies": [],
+      "KeepAlive": true,
+      "OutputStream": null,
+      "RedirectLocation": null,
+      "StatusDescription": "OK",
+      "StatusCode": 200,
+      "ProtocolVersion": {
+        "Major": 1,
+        "Minor": 1,
+        "Build": -1,
+        "Revision": -1,
+        "MajorRevision": -1,
+        "MinorRevision": -1
+      }
+    }
+  ],
+  "SourceIdentifier": "http",
+  "TimeGenerated": "2025-08-02T21:55:04.1930022+02:00",
+  "MessageData": {
+    "Url": "http://localhost:6161/",
+    "Context": {
+      "Request": {
+        "AcceptTypes": null,
+        "UserLanguages": null,
+        "Cookies": [],
+        "ContentEncoding": {
+          "Preamble": null,
+          "BodyName": "utf-8",
+          "EncodingName": "Unicode (UTF-8)",
+          "HeaderName": "utf-8",
+          "WebName": "utf-8",
+          "WindowsCodePage": 1200,
+          "IsBrowserDisplay": true,
+          "IsBrowserSave": true,
+          "IsMailNewsDisplay": true,
+          "IsMailNewsSave": true,
+          "IsSingleByte": false,
+          "EncoderFallback": {
+            "DefaultString": "�",
+            "MaxCharCount": 1
+          },
+          "DecoderFallback": {
+            "DefaultString": "�",
+            "MaxCharCount": 1
+          },
+          "IsReadOnly": true,
+          "CodePage": 65001
+        },
+        "ContentType": null,
+        "IsLocal": true,
+        "IsWebSocketRequest": false,
+        "KeepAlive": true,
+        "QueryString": [],
+        "RawUrl": "/",
+        "UserAgent": "Mozilla/5.0 (Windows NT 10.0; Microsoft Windows 10.0.22631; fr-FR) PowerShell/7.5.2",
+        "UserHostAddress": "[::1]:6161",
+        "UserHostName": "localhost:6161",
+        "UrlReferrer": null,
+        "Url": "http://localhost:6161/",
+        "ProtocolVersion": {
+          "Major": 1,
+          "Minor": 1,
+          "Build": -1,
+          "Revision": -1,
+          "MajorRevision": -1,
+          "MinorRevision": -1
+        },
+        "ClientCertificateError": null,
+        "RequestTraceIdentifier": "00000000-0000-0000-0400-0040080000ff",
+        "ContentLength64": 0,
+        "Headers": [
+          "Accept-Encoding",
+          "Host",
+          "User-Agent"
+        ],
+        "HttpMethod": "GET",
+        "InputStream": {
+          "CanRead": true,
+          "CanWrite": true,
+          "CanSeek": true,
+          "Length": 0,
+          "Position": 0,
+          "CanTimeout": false,
+          "ReadTimeout": null,
+          "WriteTimeout": null
+        },
+        "IsAuthenticated": false,
+        "IsSecureConnection": false,
+        "ServiceName": null,
+        "TransportContext": {},
+        "HasEntityBody": false,
+        "RemoteEndPoint": {
+          "AddressFamily": 23,
+          "Address": {
+            "AddressFamily": 23,
+            "ScopeId": 0,
+            "IsIPv6Multicast": false,
+            "IsIPv6LinkLocal": false,
+            "IsIPv6SiteLocal": false,
+            "IsIPv6Teredo": false,
+            "IsIPv6UniqueLocal": false,
+            "IsIPv4MappedToIPv6": false,
+            "Address": null
+          },
+          "Port": 51882
+        },
+        "LocalEndPoint": {
+          "AddressFamily": 23,
+          "Address": {
+            "AddressFamily": 23,
+            "ScopeId": 0,
+            "IsIPv6Multicast": false,
+            "IsIPv6LinkLocal": false,
+            "IsIPv6SiteLocal": false,
+            "IsIPv6Teredo": false,
+            "IsIPv6UniqueLocal": false,
+            "IsIPv4MappedToIPv6": false,
+            "Address": null
+          },
+          "Port": 6161
+        }
+      },
+      "User": null,
+      "Response": {
+        "Headers": [
+          "Content-Length"
+        ],
+        "ContentEncoding": null,
+        "ContentType": null,
+        "SendChunked": false,
+        "ContentLength64": 189,
+        "Cookies": [],
+        "KeepAlive": true,
+        "OutputStream": null,
+        "RedirectLocation": null,
+        "StatusDescription": "OK",
+        "StatusCode": 200,
+        "ProtocolVersion": {
+          "Major": 1,
+          "Minor": 1,
+          "Build": -1,
+          "Revision": -1,
+          "MajorRevision": -1,
+          "MinorRevision": -1
+        }
+      }
+    },
+    "Request": {
+      "AcceptTypes": null,
+      "UserLanguages": null,
+      "Cookies": [],
+      "ContentEncoding": {
+        "Preamble": null,
+        "BodyName": "utf-8",
+        "EncodingName": "Unicode (UTF-8)",
+        "HeaderName": "utf-8",
+        "WebName": "utf-8",
+        "WindowsCodePage": 1200,
+        "IsBrowserDisplay": true,
+        "IsBrowserSave": true,
+        "IsMailNewsDisplay": true,
+        "IsMailNewsSave": true,
+        "IsSingleByte": false,
+        "EncoderFallback": {
+          "DefaultString": "�",
+          "MaxCharCount": 1
+        },
+        "DecoderFallback": {
+          "DefaultString": "�",
+          "MaxCharCount": 1
+        },
+        "IsReadOnly": true,
+        "CodePage": 65001
+      },
+      "ContentType": null,
+      "IsLocal": true,
+      "IsWebSocketRequest": false,
+      "KeepAlive": true,
+      "QueryString": [],
+      "RawUrl": "/",
+      "UserAgent": "Mozilla/5.0 (Windows NT 10.0; Microsoft Windows 10.0.22631; fr-FR) PowerShell/7.5.2",
+      "UserHostAddress": "[::1]:6161",
+      "UserHostName": "localhost:6161",
+      "UrlReferrer": null,
+      "Url": "http://localhost:6161/",
+      "ProtocolVersion": {
+        "Major": 1,
+        "Minor": 1,
+        "Build": -1,
+        "Revision": -1,
+        "MajorRevision": -1,
+        "MinorRevision": -1
+      },
+      "ClientCertificateError": null,
+      "RequestTraceIdentifier": "00000000-0000-0000-0400-0040080000ff",
+      "ContentLength64": 0,
+      "Headers": [
+        "Accept-Encoding",
+        "Host",
+        "User-Agent"
+      ],
+      "HttpMethod": "GET",
+      "InputStream": {
+        "CanRead": true,
+        "CanWrite": true,
+        "CanSeek": true,
+        "Length": 0,
+        "Position": 0,
+        "CanTimeout": false,
+        "ReadTimeout": null,
+        "WriteTimeout": null
+      },
+      "IsAuthenticated": false,
+      "IsSecureConnection": false,
+      "ServiceName": null,
+      "TransportContext": {},
+      "HasEntityBody": false,
+      "RemoteEndPoint": {
+        "AddressFamily": 23,
+        "Address": {
+          "AddressFamily": 23,
+          "ScopeId": 0,
+          "IsIPv6Multicast": false,
+          "IsIPv6LinkLocal": false,
+          "IsIPv6SiteLocal": false,
+          "IsIPv6Teredo": false,
+          "IsIPv6UniqueLocal": false,
+          "IsIPv4MappedToIPv6": false,
+          "Address": null
+        },
+        "Port": 51882
+      },
+      "LocalEndPoint": {
+        "AddressFamily": 23,
+        "Address": {
+          "AddressFamily": 23,
+          "ScopeId": 0,
+          "IsIPv6Multicast": false,
+          "IsIPv6LinkLocal": false,
+          "IsIPv6SiteLocal": false,
+          "IsIPv6Teredo": false,
+          "IsIPv6UniqueLocal": false,
+          "IsIPv4MappedToIPv6": false,
+          "Address": null
+        },
+        "Port": 6161
+      }
+    },
+    "Response": {
+      "Headers": [
+        "Content-Length"
+      ],
+      "ContentEncoding": null,
+      "ContentType": null,
+      "SendChunked": false,
+      "ContentLength64": 189,
+      "Cookies": [],
+      "KeepAlive": true,
+      "OutputStream": null,
+      "RedirectLocation": null,
+      "StatusDescription": "OK",
+      "StatusCode": 200,
+      "ProtocolVersion": {
+        "Major": 1,
+        "Minor": 1,
+        "Build": -1,
+        "Revision": -1,
+        "MajorRevision": -1,
+        "MinorRevision": -1
+      }
     }
   }
 }

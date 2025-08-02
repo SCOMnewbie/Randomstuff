@@ -53,6 +53,10 @@ function Write-RequestLog {
         if ($mutex.WaitOne(10000)) {
             try {
 
+                #if( -not $PSBoundParameters.ContainsKey('StatusCode')){
+                #    $StatusCode = $Context.Response.StatusCode
+                #}
+
                 $logDir = Split-Path $LogFilePath
                 if (!(Test-Path $logDir)) {
                     Write-Verbose "Folder doesn't exist, let's create it"
@@ -65,8 +69,8 @@ function Write-RequestLog {
                     "##Fields: date time s-ip cs-method cs-uri-stem cs-uri-query s-port cs-username c-ip cs(User-Agent) cs(Referer) sc-status sc-substatus sc-win32-status time-taken" | Out-File -FilePath $LogFilePath -Force -Encoding utf8
                 }
 
-                ##Fields: date,time,s-ip,cs-method,cs-uri-stem cs-uri-query s-port ->>>> cs-username c-ip cs(User-Agent) cs(Referer) sc-status sc-substatus sc-win32-status time-taken
-                $LogEntry = "{0},{1},{2},{3},{4},{5},{6}" -f $(get-date -Format yyyy-MM-dd),$(get-date -Format HH:mm:ss),$context.Request.UserHostAddress,$context.Request.HttpMethod,$Context.Request.RawUrl,$QueryParameter,$context.Request.LocalEndPoint.port 
+                ##Fields: date,time,s-ip,cs-method,cs-uri-stem cs-uri-query s-port cs-username c-ip cs(User-Agent) ->>>> sc-status sc-substatus sc-win32-status time-taken
+                $LogEntry = "{0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10}" -f $(get-date -Format yyyy-MM-dd),$(get-date -Format HH:mm:ss),$context.Request.UserHostAddress,$context.Request.HttpMethod,$Context.Request.RawUrl,$QueryParameter,$context.Request.LocalEndPoint.port,'-','-',$context.Request.UserAgent,$context.Response.StatusCode
 
                 Add-Content -Path $LogFilePath -Value $LogEntry
                 Write-Host $logEntry -ForegroundColor $HostColor
