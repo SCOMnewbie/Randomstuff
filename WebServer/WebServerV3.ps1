@@ -234,9 +234,10 @@ while ($Httplistener.IsListening) {
 
         # If parameter is not validated, skip this step
         if (-not $ShouldExit) {
-            #Write-host "Responded to $($Request.Url) in $([datetime]::Now - $Event.TimeGenerated)" -ForegroundColor Cyan
-            Write-BackendLog -LogFilePath $BackendLogFilePath -LogLevel INFO -HostColor Cyan -Message "Responded to $($Request.Url) in $([datetime]::Now - $Event.TimeGenerated)"
-            Write-RequestLog -Event $Event -LogFilePath $RequestLogFilePath
+            # Close the response stream and write the response
+            $TimeTakenInMs = [Math]::Round($($([datetime]::Now - $Event.TimeGenerated).TotalMilliseconds),0)
+            Write-BackendLog -LogFilePath $BackendLogFilePath -LogLevel INFO -HostColor Cyan -Message "Responded to $($RequestInfo.AbsolutePath) in $TimeTakenInMs ms"
+            Write-RequestLog -Event $Event -LogFilePath $RequestLogFilePath -TimeTakenInMs $TimeTakenInMs
             $Event | Remove-Event
         }
     }
