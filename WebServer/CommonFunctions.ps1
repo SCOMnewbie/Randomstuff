@@ -1,9 +1,9 @@
 # Return a 404
 function NotFound {
-    param($context, $Event, $QueryParameter, $RequestLogFilePath)
-    $Context.Response.StatusCode = 404
-    Write-RequestLog -Context $Context -QueryParameter $QueryParameter -LogFilePath $RequestLogFilePath
-    $Context.Response.Close()
+    param($Event, $RequestLogFilePath)
+    $Event.MessageData.Response.StatusCode = 404
+    Write-RequestLog -Event $Event -LogFilePath $RequestLogFilePath
+    $Event.MessageData.Response.Close()
     # Remove unwanted events
     $Event | Remove-Event
     break
@@ -11,10 +11,10 @@ function NotFound {
 
 # Return a 403 (I know who you are but not allowed)
 function Forbidden {
-    param($context, $Event, $QueryParameter, $RequestLogFilePath)
-    $Context.Response.StatusCode = 403
-    Write-RequestLog -Context $Context -QueryParameter $QueryParameter -LogFilePath $RequestLogFilePath
-    $Context.Response.Close()
+    param($Event, $RequestLogFilePath)
+    $Event.MessageData.Response.StatusCode  = 403
+    Write-RequestLog -Event $Event -LogFilePath $RequestLogFilePath
+    $Event.MessageData.Response.Close()
     # Remove unwanted events
     $Event | Remove-Event
     break
@@ -22,10 +22,10 @@ function Forbidden {
 
 # Return a 401 (I don't know you get out)
 function Unauthorized {
-    param($Context, $Event, $QueryParameter, $RequestLogFilePath)
-    $Context.Response.StatusCode = 401
-    Write-RequestLog -Context $Context -QueryParameter $QueryParameter -LogFilePath $RequestLogFilePath
-    $Context.Response.Close()
+    param($Event, $RequestLogFilePath)
+    $Event.MessageData.Response.StatusCode  = 401
+    Write-RequestLog -Event $Event -LogFilePath $RequestLogFilePath
+    $Event.MessageData.Response.Close()
     # Remove unwanted events
     $Event | Remove-Event
     break
@@ -37,8 +37,7 @@ function Write-RequestLog {
         [Parameter(Mandatory)]
         [ValidateNotNullOrEmpty()]
         [string]$LogFilePath,
-        $Context,
-        $QueryParameter,
+        $Event,
         [Parameter()]
         [ValidateSet("Black", "DarkBlue", "DarkGreen", "DarkCyan", "DarkRed", "DarkMagenta", "DarkYellow", "Gray", "DarkGray", "Blue", "Green", "Cyan", "Red", "Magenta", "Yellow", "White")]
         [string]$HostColor = 'Magenta'
@@ -53,10 +52,6 @@ function Write-RequestLog {
         if ($mutex.WaitOne(10000)) {
             try {
 
-                #if( -not $PSBoundParameters.ContainsKey('StatusCode')){
-                #    $StatusCode = $Context.Response.StatusCode
-                #}
-
                 $logDir = Split-Path $LogFilePath
                 if (!(Test-Path $logDir)) {
                     Write-Verbose "Folder doesn't exist, let's create it"
@@ -66,11 +61,10 @@ function Write-RequestLog {
                 if (!(Test-Path $LogFilePath)) {
                     #File does not exist, create header
                     Write-Verbose "File doesn't exist, let's create it with header"
-                    "##Fields: date time s-ip cs-method cs-uri-stem cs-uri-query s-port cs-username c-ip cs(User-Agent) cs(Referer) sc-status sc-substatus sc-win32-status time-taken" | Out-File -FilePath $LogFilePath -Force -Encoding utf8
+                    "date,time,s-ip,cs-method,cs-uri-stem,cs-uri-query,s-port,cs(User-Agent),sc-status" | Out-File -FilePath $LogFilePath -Force -Encoding utf8
                 }
 
-                ##Fields: date,time,s-ip,cs-method,cs-uri-stem cs-uri-query s-port cs-username c-ip cs(User-Agent) ->>>> sc-status sc-substatus sc-win32-status time-taken
-                $LogEntry = "{0},{1},{2},{3},{4},{5},{6},{7},{8},{9},{10}" -f $(get-date -Format yyyy-MM-dd),$(get-date -Format HH:mm:ss),$context.Request.UserHostAddress,$context.Request.HttpMethod,$Context.Request.RawUrl,$QueryParameter,$context.Request.LocalEndPoint.port,'-','-',$context.Request.UserAgent,$context.Response.StatusCode
+                $LogEntry = "{0},{1},{2},{3},{4},{5},{6},{7},{8}" -f $(get-date -Format yyyy-MM-dd),$(get-date -Format HH:mm:ss),$Event.MessageData.Request.UserHostAddress,$Event.MessageData.Request.HttpMethod,$Event.MessageData.Request.RawUrl,$($Event.MessageData.Request.Url.Query.ToString().replace('?','')),$Event.MessageData.Request.LocalEndPoint.port,$Event.MessageData.Request.UserAgent,$Event.MessageData.Response.StatusCode
 
                 Add-Content -Path $LogFilePath -Value $LogEntry
                 Write-Host $logEntry -ForegroundColor $HostColor
