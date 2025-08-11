@@ -6,7 +6,9 @@ param(
     [string[]]$ListenerPrefix = @('http://localhost:6161/'),
     $TenantId = 'e192cada-a04d-4cfc-8b90-d14338b2c7ec', # Azure Tenant Id
     $Audience = 'api://fca4cdf3-031d-41a2-a0be-ecd854b2f201', # Each application has a single audience
-    $LogFolderName = 'myapi' # This is where we will store the logs under a temp folder
+    $LogFolderName = 'myapi', # This is where we will store the logs under a temp folder
+    $ClientId = 'fca4cdf3-031d-41a2-a0be-ecd854b2f201', # The Client Id of the application
+    $ClientSecret = $env:DEMOClientSecret # The secret used to call the Graph API (On Behalf flow)
 )
 
 # Load Module
@@ -16,14 +18,14 @@ Import-Module -Name 'PSMsalNet' -Force -ErrorAction Stop
 # Load function in memory
 . $PSScriptRoot\CommonFunctions.ps1
 . $PSScriptRoot\useexternalfunction.ps1
+. $PSScriptRoot\calluserinfofromgraphapi.ps1
 
 $BackendLogFileName = 'Backend_{0}.log' -f $(Get-Date -Format 'yyyy-MM-dd')
 $RequestLogFileName = 'Request_{0}.log' -f $(Get-Date -Format 'yyyy-MM-dd')
-$BackendLogFilePath = Join-Path $([System.IO.Path]::GetTempPath()) $LogFolderName $BackendLogFileName
-$RequestLogFilePath = Join-Path $([System.IO.Path]::GetTempPath()) $LogFolderName $RequestLogFileName
+$Global:BackendLogFilePath = Join-Path $([System.IO.Path]::GetTempPath()) $LogFolderName $BackendLogFileName
+$Global:RequestLogFilePath = Join-Path $([System.IO.Path]::GetTempPath()) $LogFolderName $RequestLogFileName
 
 Write-BackendLog -LogFilePath $BackendLogFilePath -LogLevel INFO -HostColor Green -Message "All logs will be generated in $BackendLogFilePath file for backend logs and $RequestLogFilePath for request logs"
-
 
 function Invoke-Middleware {
     param($Event)
@@ -62,7 +64,7 @@ function Invoke-Middleware {
             Write-BackendLog -LogFilePath $BackendLogFilePath -LogLevel INFO -HostColor Yellow -Message '[middleware] Call /useexternalfunction route Admin role not required'
             break
         }
-        'admin' {
+        'calluserinfofromgraphapi' {
             # Exemple to use an admin route. This is how we declare this route require AuthZ
             $IsAdminRequired = $true
             # This is the role claim we're waiting for in the token. This part is validated bellow
@@ -223,7 +225,29 @@ while ($Httplistener.IsListening) {
                     # IMPORTANT make sure this variable is assigned BEFORE the NotFound function
                     $ShouldExit = $true
                     # return 404 if user provide bad parameters
-                    NotFound -Event $Event
+                    NotFound -Event $Event -RequestLogFilePath $RequestLogFilePath
+                }
+            }
+            'calluserinfofromgraphapi'{
+                # validate query parameters
+                $QueryParameters = $($Event.MessageData.Request.Url.Query.ToString().replace('?',''))
+                if($QueryParameters -match 'UserPrincipalName=([\w-\.]+@([\w-]+\.)+[\w-]{2,4})') {
+                    $UserPrincipalName = $matches[1]
+                    $UserId = $null
+                    $Json = calluserinfofromgraphapi -UserPrincipalName $UserPrincipalName -OBOToken $Event.MessageData.Request.Headers['Authorization'] -ClientId $ClientId -ClientSecret $ClientSecret -TenantId $TenantId | ConvertTo-Json -Depth 3
+                    $Event.MessageData.Response.Close($OutputEncoding.GetBytes($Json), $false)
+                }
+                elseif($QueryParameters -match 'UserId=([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})') {
+                    $UserId = [guid]$matches[1]
+                    $UserPrincipalName = $null
+                }
+                else {
+                    #TODO:Validate this part
+                    # Parameter is not validated
+                    # IMPORTANT make sure this variable is assigned BEFORE the NotFound function
+                    $ShouldExit = $true
+                    # return 404 if user provide bad parameters
+                    NotFound -Event $Event -RequestLogFilePath $RequestLogFilePath
                 }
             }
             default {
